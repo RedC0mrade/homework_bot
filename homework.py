@@ -6,6 +6,10 @@ import sys
 import time
 
 
+class APIResponseCodeError(Exception):
+    pass
+
+
 from dotenv import load_dotenv
 
 load_dotenv()
@@ -27,9 +31,10 @@ HOMEWORK_VERDICTS = {
 
 logging.basicConfig(
     level=logging.DEBUG,
-    filename='main.log',
-    filemode='w',
-    encoding='utf-8',
+    handlers=[
+        logging.FileHandler(filename='main.log', mode='w', encoding='utf-8'),
+        logging.StreamHandler(stream=sys.stdout)
+    ],
     format='%(asctime)s, %(levelname)s, %(message)s, %(name)s'
 )
 
@@ -68,17 +73,19 @@ def send_message(bot, message):
 
 def get_api_answer(timestamp):
     """Get request status"""
-    homework_statuses = requests.get(ENDPOINT,
-                                     headers=HEADERS,
-                                     params={'from_date': timestamp})
-    if homework_statuses.status_code == 200:
-        logging.debug('endpoint excess')
-        return homework_statuses.json()
-    else:
-        logging.error(
-            f'endpoint return status {homework_statuses.status_code}'
-        )
-        return False
+    try:
+        homework_statuses = requests.get(ENDPOINT,
+                                         headers=HEADERS,
+                                         params={'from_date': timestamp})
+        if homework_statuses.status_code == 200:
+            logging.debug('endpoint excess')
+            return homework_statuses.json()
+        else:
+            logging.error(
+                f'endpoint return status {homework_statuses.status_code}'
+            )
+    except Exception as error:
+        logging.error(f'request error: {error}')
 
 
 def check_response(response):
@@ -104,7 +111,8 @@ def parse_status(homeworks):
         try:
             homework_name = homeworks[0]['lesson_name']
             logging.debug('Response lesson name is correct')
-            return f'Изменился статус проверки работы "{homework_name}". {HOMEWORK_VERDICTS[verdict]}'
+            return f'Изменился статус проверки работы' \
+                   f' "{homework_name}". {HOMEWORK_VERDICTS[verdict]}'
         except Exception as error:
             logging.error(f'Response status is incorrect, {error}')
     except Exception as error:
