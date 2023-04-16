@@ -97,6 +97,7 @@ def check_response(response):
 
 
 def parse_status(homeworks):
+    """Проверка статуса работы"""
     try:
         verdict = homeworks[0]['status']
         logging.debug('Response status is correct')
