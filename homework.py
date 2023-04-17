@@ -7,6 +7,7 @@ import time
 
 
 class APIResponseCodeError(Exception):
+    """Api error"""
     pass
 
 
@@ -52,14 +53,12 @@ def check_tokens():
                 logging.debug('Токен TELEGRAM_CHAT_ID в порядке')
                 return True
             except Exception as error:
-                logging.critical(f'ошибка TELEGRAM_CHAT_ID {error}')
-                return False
+                raise logging.critical(f'ошибка TELEGRAM_CHAT_ID {error}')
         except Exception as error:
-            logging.critical(f'ошибка TELEGRAM_TOKEN {error}')
-            return False
+            raise logging.critical(f'ошибка TELEGRAM_TOKEN {error}')
     except Exception as error:
-        logging.critical(f'ошибка PRACTICUM_TOKEN {error}')
-        return False
+        raise logging.critical(f'ошибка PRACTICUM_TOKEN {error}')
+
 
 
 def send_message(bot, message):
@@ -77,15 +76,19 @@ def get_api_answer(timestamp):
         homework_statuses = requests.get(ENDPOINT,
                                          headers=HEADERS,
                                          params={'from_date': timestamp})
-        if homework_statuses.status_code == 200:
-            logging.debug('endpoint excess')
-            return homework_statuses.json()
-        else:
-            logging.error(
-                f'endpoint return status {homework_statuses.status_code}'
-            )
     except Exception as error:
         logging.error(f'request error: {error}')
+
+    if homework_statuses.status_code != 200:
+        raise logging.error(
+            f'Failed get answer from API. Status code = '
+            f'{homework_statuses.status_code}'
+        )
+    try:
+        if type(homework_statuses.json()) == dict:
+            return homework_statuses.json()
+    except Exception as error:
+        raise logging.error(f'{error}')
 
 
 def check_response(response):
@@ -105,19 +108,23 @@ def check_response(response):
 
 def parse_status(homeworks):
     """Проверка статуса работы"""
+    homework = homeworks[0]
     try:
-        verdict = homeworks[0]['status']
+        homework['status']
         logging.debug('Response status is correct')
-        try:
-            homework_name = homeworks[0]['lesson_name']
-            logging.debug('Response lesson name is correct')
-            return f'Изменился статус проверки работы' \
-                   f' "{homework_name}". {HOMEWORK_VERDICTS[verdict]}'
-        except Exception as error:
-            logging.error(f'Response status is incorrect, {error}')
+    except KeyError as error:
+        raise logging.error(f'Response lesson name is incorrect, {error}')
+    try:
+        homework['lesson_name']
     except Exception as error:
-        logging.error(f'Response lesson name is incorrect, {error}')
-
+        raise logging.error(f'Response status is incorrect, {error}')
+    try:
+        if type(f'Изменился статус проверки работы' 
+                f'"{homework["lesson_name"]}". '
+                f'{HOMEWORK_VERDICTS[homework["status"]]}') == str:
+            return f'Изменился статус проверки работыf "{homework["lesson_name"]}". {HOMEWORK_VERDICTS[homework["status"]]}'
+    except Exception as error:
+        raise logging.error(f'return not string {error}')
 
 def main():
     """Основная логика работы бота."""
