@@ -21,6 +21,7 @@ TELEGRAM_TOKEN = os.getenv('TELEGRAM_TOKEN')
 TELEGRAM_CHAT_ID = os.getenv('TELEGRAM_CHAT_ID')
 
 RETRY_PERIOD = 600
+ONE_MONTH_TIME = 2629743
 ENDPOINT = 'https://practicum.yandex.ru/api/user_api/homework_statuses/'
 HEADERS = {'Authorization': f'OAuth {PRACTICUM_TOKEN}'}
 
@@ -53,12 +54,14 @@ def check_tokens():
                 logging.debug('Токен TELEGRAM_CHAT_ID в порядке')
                 return True
             except Exception as error:
-                raise logging.critical(f'ошибка TELEGRAM_CHAT_ID {error}')
+                logging.critical(f'ошибка TELEGRAM_CHAT_ID {error}')
+                raise ValueError(f'missing token "TELEGRAM_CHAT_ID"')
         except Exception as error:
-            raise logging.critical(f'ошибка TELEGRAM_TOKEN {error}')
+            logging.critical(f'ошибка TELEGRAM_TOKEN {error}')
+            raise ValueError(f'missing token "TELEGRAM_TOKEN"')
     except Exception as error:
-        raise logging.critical(f'ошибка PRACTICUM_TOKEN {error}')
-
+        logging.critical(f'ошибка PRACTICUM_TOKEN {error}')
+        raise ValueError(f'missing token "PRACTICUM_TOKEN"')
 
 
 def send_message(bot, message):
@@ -68,63 +71,63 @@ def send_message(bot, message):
         logging.debug('send message')
     except Exception as error:
         logging.error(f'Sending message failed error: {error}')
+        raise ValueError(f'Message not send')
 
 
 def get_api_answer(timestamp):
     """Get request status"""
     try:
-        homework_statuses = requests.get(ENDPOINT,
-                                         headers=HEADERS,
-                                         params={'from_date': timestamp})
+        response = requests.get(ENDPOINT,
+                                headers=HEADERS,
+                                params={'from_date': timestamp})
     except Exception as error:
         logging.error(f'request error: {error}')
+        raise ValueError(f'request error: {error}')
 
-    if homework_statuses.status_code != 200:
-        raise logging.error(
-            f'Failed get answer from API. Status code = '
-            f'{homework_statuses.status_code}'
-        )
+    if response.status_code != 200:
+        logging.error(f'Failed get answer from API. Status code = '
+                      f'{response.status_code}')
+        raise ConnectionError('Failed get answer from API.')
     try:
-        if type(homework_statuses.json()) == dict:
-            return homework_statuses.json()
+        if type(response.json()) == dict:
+            print(response.json())
+            return response.json()
     except Exception as error:
-        raise logging.error(f'{error}')
+        logging.error(f'Type of homework_statuses not dict {error}')
+        raise KeyError('Type of homework_statuses not dict')
 
 
 def check_response(response):
     """Return endpoint"""
+
     try:
-        type(response) == dict
-        logging.debug('Endpoint is dict')
-        try:
-            response['homeworks']
-            logging.debug('key homework excess')
-            return response['homeworks']
-        except Exception as error:
-            logging.error(f'No correct response {error}')
+        response['homeworks']
+        logging.debug('key homework excess')
+        return response['homeworks']
     except Exception as error:
-        logging.error(f'No correct type {error}')
+        logging.error(f'No correct response {error}')
+        raise KeyError('Dict dont have a key "homeworks"')
 
 
 def parse_status(homeworks):
     """Проверка статуса работы"""
-    homework = homeworks[0]
     try:
-        homework['status']
+        homeworks[0]['status']
         logging.debug('Response status is correct')
     except KeyError as error:
         raise logging.error(f'Response lesson name is incorrect, {error}')
     try:
-        homework['lesson_name']
+        homeworks[0]['lesson_name']
     except Exception as error:
         raise logging.error(f'Response status is incorrect, {error}')
     try:
         if type(f'Изменился статус проверки работы' 
-                f'"{homework["lesson_name"]}". '
-                f'{HOMEWORK_VERDICTS[homework["status"]]}') == str:
-            return f'Изменился статус проверки работыf "{homework["lesson_name"]}". {HOMEWORK_VERDICTS[homework["status"]]}'
+                f'"{homeworks["lesson_name"]}". '
+                f'{HOMEWORK_VERDICTS[homeworks["status"]]}') == str:
+            return f'Изменился статус проверки работыf "{homeworks["lesson_name"]}". {HOMEWORK_VERDICTS[homeworks["status"]]}'
     except Exception as error:
         raise logging.error(f'return not string {error}')
+
 
 def main():
     """Основная логика работы бота."""
@@ -133,7 +136,7 @@ def main():
         sys.exit()
 
     bot = telegram.Bot(token=TELEGRAM_TOKEN)
-    timestamp = int(time.time()) - RETRY_PERIOD
+    timestamp = int(time.time()) - ONE_MONTH_TIME
     anti_spam_check = []
 
     while True:
