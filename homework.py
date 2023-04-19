@@ -12,6 +12,7 @@ load_dotenv()
 
 class APIResponseCodeError(Exception):
     """Api error."""
+
     pass
 
 
@@ -43,7 +44,6 @@ logging.basicConfig(
 
 def check_tokens():
     """Check tokens exists."""
-
     if PRACTICUM_TOKEN and TELEGRAM_TOKEN and TELEGRAM_CHAT_ID:
         logging.debug('all token in place')
         return True
@@ -54,18 +54,16 @@ def check_tokens():
 
 def send_message(bot, message):
     """Send message."""
-
     try:
         bot.send_message(TELEGRAM_CHAT_ID, message)
         logging.debug('send message')
     except Exception as error:
         logging.error(f'Sending message failed error: {error}')
-        raise ValueError(f'Message not send')
+        raise ValueError(f'Message not send {error}')
 
 
 def get_api_answer(timestamp):
-    """Get request status"""
-
+    """Get request status."""
     try:
         response = requests.get(ENDPOINT,
                                 headers=HEADERS,
@@ -90,7 +88,6 @@ def get_api_answer(timestamp):
 
 def check_response(response):
     """Return endpoint."""
-
     if type(response) != dict:
         logging.error(f'response not dict, {type(response)}')
         raise TypeError(f'response not dict, {type(response)}')
@@ -111,7 +108,6 @@ def check_response(response):
 
 def parse_status(homeworks):
     """Проверка статуса работы."""
-
     try:
         status = homeworks.get('status')
         verdict = HOMEWORK_VERDICTS[status]
@@ -128,8 +124,8 @@ def parse_status(homeworks):
         raise f'The data "lesson_name" is not correct, {error}'
 
     if homeworks.get('homework_name') is None:
-        logging.error(f'Key "homework_name" not exists')
-        raise KeyError(f'Key "homework_name" not exists')
+        logging.error('Key "homework_name" not exists')
+        raise KeyError('Key "homework_name" not exists')
 
     try:
         message = f'Изменился статус проверки работы "{homework_name}". ' \
@@ -144,7 +140,6 @@ def parse_status(homeworks):
 
 def main():
     """Основная логика работы бота."""
-
     if not check_tokens():
         sys.exit()
 
