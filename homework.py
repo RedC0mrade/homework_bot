@@ -43,8 +43,8 @@ logging.basicConfig(
 
 
 def check_tokens():
-
     """Check tokens exists"""
+
     if PRACTICUM_TOKEN and TELEGRAM_TOKEN and TELEGRAM_CHAT_ID:
         logging.debug('all token in place')
         return True
@@ -54,8 +54,8 @@ def check_tokens():
 
 
 def send_message(bot, message):
-
     """Send message"""
+
     try:
         bot.send_message(TELEGRAM_CHAT_ID, message)
         logging.debug('send message')
@@ -65,8 +65,8 @@ def send_message(bot, message):
 
 
 def get_api_answer(timestamp):
-
     """Get request status"""
+
     try:
         response = requests.get(ENDPOINT,
                                 headers=HEADERS,
@@ -90,8 +90,8 @@ def get_api_answer(timestamp):
 
 
 def check_response(response):
-
     """Return endpoint"""
+
     if type(response) != dict:
         logging.error(f'response not dict, {type(response)}')
         raise TypeError(f'response not dict, {type(response)}')
@@ -111,7 +111,6 @@ def check_response(response):
 
 
 def parse_status(homeworks):
-
     """Проверка статуса работы"""
 
     try:
@@ -145,8 +144,8 @@ def parse_status(homeworks):
 
 
 def main():
-
     """Основная логика работы бота."""
+
     if not check_tokens():
         sys.exit()
 
