@@ -11,8 +11,7 @@ load_dotenv()
 
 
 class APIResponseCodeError(Exception):
-
-    """Api error"""
+    """Api error."""
     pass
 
 
@@ -43,7 +42,7 @@ logging.basicConfig(
 
 
 def check_tokens():
-    """Check tokens exists"""
+    """Check tokens exists."""
 
     if PRACTICUM_TOKEN and TELEGRAM_TOKEN and TELEGRAM_CHAT_ID:
         logging.debug('all token in place')
@@ -54,7 +53,7 @@ def check_tokens():
 
 
 def send_message(bot, message):
-    """Send message"""
+    """Send message."""
 
     try:
         bot.send_message(TELEGRAM_CHAT_ID, message)
@@ -90,7 +89,7 @@ def get_api_answer(timestamp):
 
 
 def check_response(response):
-    """Return endpoint"""
+    """Return endpoint."""
 
     if type(response) != dict:
         logging.error(f'response not dict, {type(response)}')
@@ -111,7 +110,7 @@ def check_response(response):
 
 
 def parse_status(homeworks):
-    """Проверка статуса работы"""
+    """Проверка статуса работы."""
 
     try:
         status = homeworks.get('status')
