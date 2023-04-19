@@ -5,21 +5,21 @@ import os
 import sys
 import time
 
+from dotenv import load_dotenv
+
+load_dotenv()
+
 
 class APIResponseCodeError(Exception):
     """Api error"""
     pass
 
 
-from dotenv import load_dotenv
-
-load_dotenv()
-
-
 PRACTICUM_TOKEN = os.getenv('PRACTICUM_TOKEN')
 TELEGRAM_TOKEN = os.getenv('TELEGRAM_TOKEN')
 TELEGRAM_CHAT_ID = os.getenv('TELEGRAM_CHAT_ID')
 
+LAST_PROJECT = 0
 RETRY_PERIOD = 600
 ONE_MONTH_TIME = 2629743
 ENDPOINT = 'https://practicum.yandex.ru/api/user_api/homework_statuses/'
@@ -43,25 +43,12 @@ logging.basicConfig(
 
 def check_tokens():
     """Check tokens exists"""
-    try:
-        PRACTICUM_TOKEN
-        logging.debug('Токен PRACTICUM_TOKEN в порядке')
-        try:
-            TELEGRAM_TOKEN
-            logging.debug('Токен TELEGRAM_TOKEN в порядке')
-            try:
-                TELEGRAM_CHAT_ID
-                logging.debug('Токен TELEGRAM_CHAT_ID в порядке')
-                return True
-            except Exception as error:
-                logging.critical(f'ошибка TELEGRAM_CHAT_ID {error}')
-                raise ValueError(f'missing token "TELEGRAM_CHAT_ID"')
-        except Exception as error:
-            logging.critical(f'ошибка TELEGRAM_TOKEN {error}')
-            raise ValueError(f'missing token "TELEGRAM_TOKEN"')
-    except Exception as error:
-        logging.critical(f'ошибка PRACTICUM_TOKEN {error}')
-        raise ValueError(f'missing token "PRACTICUM_TOKEN"')
+    if PRACTICUM_TOKEN and TELEGRAM_TOKEN and TELEGRAM_CHAT_ID:
+        logging.debug('all token in place')
+        return True
+    else:
+        logging.critical('One or more Token not found')
+        return False
 
 
 def send_message(bot, message):
@@ -80,6 +67,7 @@ def get_api_answer(timestamp):
         response = requests.get(ENDPOINT,
                                 headers=HEADERS,
                                 params={'from_date': timestamp})
+        logging.debug(f'status {response}. Ok')
     except Exception as error:
         logging.error(f'request error: {error}')
         raise ValueError(f'request error: {error}')
@@ -90,7 +78,7 @@ def get_api_answer(timestamp):
         raise ConnectionError('Failed get answer from API.')
     try:
         if type(response.json()) == dict:
-            print(response.json())
+            logging.debug('response type dict')
             return response.json()
     except Exception as error:
         logging.error(f'Type of homework_statuses not dict {error}')
@@ -99,58 +87,83 @@ def get_api_answer(timestamp):
 
 def check_response(response):
     """Return endpoint"""
-
+    if type(response) != dict:
+        logging.error(f'response not dict, {type(response)}')
+        raise TypeError(f'response not dict, {type(response)}')
     try:
         response['homeworks']
         logging.debug('key homework excess')
-        return response['homeworks']
     except Exception as error:
-        logging.error(f'No correct response {error}')
-        raise KeyError('Dict dont have a key "homeworks"')
+        logging.error(f'Dict dont have a key "homeworks" {error}')
+        raise KeyError(f'Dict dont have a key "homeworks" {error}')
+
+    if type(response['homeworks']) != list:
+        logging.error(f'homeworks not list, {type(response["homeworks"])}')
+        raise TypeError(f'homeworks not list, {type(response["homeworks"])}')
+    else:
+        logging.debug('type of "homeworks" is list')
+        return response['homeworks']
 
 
 def parse_status(homeworks):
     """Проверка статуса работы"""
+
     try:
-        homeworks[0]['status']
-        logging.debug('Response status is correct')
+        status = homeworks.get('status')
+        verdict = HOMEWORK_VERDICTS[status]
+        logging.debug(f'Response status is correct {status}')
     except KeyError as error:
-        raise logging.error(f'Response lesson name is incorrect, {error}')
+        logging.error(f'status of homeworks is incorrect, {error}')
+        raise f'The data "status" is not correct, {error}'
+
     try:
-        homeworks[0]['lesson_name']
+        homework_name = homeworks.get('homework_name')
+        logging.debug(f'Name homework {homework_name}')
     except Exception as error:
-        raise logging.error(f'Response status is incorrect, {error}')
+        logging.error(f'lesson_name is incorrect, {error}')
+        raise f'The data "lesson_name" is not correct, {error}'
+
+    if homeworks.get('homework_name') is None:
+        logging.error(f'Key "homework_name" not exists')
+        raise KeyError(f'Key "homework_name" not exists')
+
     try:
-        if type(f'Изменился статус проверки работы' 
-                f'"{homeworks["lesson_name"]}". '
-                f'{HOMEWORK_VERDICTS[homeworks["status"]]}') == str:
-            return f'Изменился статус проверки работыf "{homeworks["lesson_name"]}". {HOMEWORK_VERDICTS[homeworks["status"]]}'
+        message = f'Изменился статус проверки работы "{homework_name}". ' \
+                  f'{verdict}'
+        if type(message) == str:
+            logging.debug(type(message))
+            return message
     except Exception as error:
-        raise logging.error(f'return not string {error}')
+        logging.error(f'return not string {error}, {type(message)}')
+        raise f'return not string {error}, {status}, {homework_name}'
 
 
 def main():
     """Основная логика работы бота."""
     if not check_tokens():
-        logging.critical('missing token or chat id')
         sys.exit()
 
     bot = telegram.Bot(token=TELEGRAM_TOKEN)
     timestamp = int(time.time()) - ONE_MONTH_TIME
-    anti_spam_check = []
+    anti_spam_check = ''
 
     while True:
         try:
             response = get_api_answer(timestamp)
             homeworks = check_response(response)
-            if homeworks and homeworks != anti_spam_check:
-                send_message(bot, parse_status(homeworks))
-                anti_spam_check = homeworks
+            sending_message = parse_status(homeworks[LAST_PROJECT])
+            if sending_message != anti_spam_check:
+                logging.debug(f'New status аvailable {sending_message}')
+                send_message(bot, sending_message)
+                anti_spam_check = sending_message
             else:
                 logging.debug('No changes')
         except Exception as error:
             message = f'Сбой в работе программы: {error}'
-            send_message(bot, message)
+            logging.error(message)
+            if message != anti_spam_check:
+                send_message(bot, message)
+                anti_spam_check = message
         finally:
             time.sleep(RETRY_PERIOD)
 
