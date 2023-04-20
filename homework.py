@@ -1,19 +1,16 @@
 import logging
-import requests
-import telegram
 import os
 import sys
 import time
 
+import requests
+import telegram
 from dotenv import load_dotenv
 
+import exceptions
+
+
 load_dotenv()
-
-
-class APIResponseCodeError(Exception):
-    """Api error."""
-
-    pass
 
 
 PRACTICUM_TOKEN = os.getenv('PRACTICUM_TOKEN')
@@ -32,24 +29,12 @@ HOMEWORK_VERDICTS = {
     'rejected': 'Работа проверена: у ревьюера есть замечания.'
 }
 
-logging.basicConfig(
-    level=logging.DEBUG,
-    handlers=[
-        logging.FileHandler(filename='main.log', mode='w', encoding='utf-8'),
-        logging.StreamHandler(stream=sys.stdout)
-    ],
-    format='%(asctime)s, %(levelname)s, %(message)s, %(name)s'
-)
-
 
 def check_tokens():
     """Check tokens exists."""
     if PRACTICUM_TOKEN and TELEGRAM_TOKEN and TELEGRAM_CHAT_ID:
         logging.debug('all token in place')
         return True
-    else:
-        logging.critical('One or more Token not found')
-        return False
 
 
 def send_message(bot, message):
@@ -57,9 +42,8 @@ def send_message(bot, message):
     try:
         bot.send_message(TELEGRAM_CHAT_ID, message)
         logging.debug('send message')
-    except Exception as error:
+    except telegram.error.TelegramError as error:
         logging.error(f'Sending message failed error: {error}')
-        raise ValueError(f'Message not send {error}')
 
 
 def get_api_answer(timestamp):
@@ -69,26 +53,26 @@ def get_api_answer(timestamp):
                                 headers=HEADERS,
                                 params={'from_date': timestamp})
         logging.debug(f'status {response}. Ok')
-    except Exception as error:
+    except requests.RequestException as error:
         logging.error(f'request error: {error}')
-        raise ValueError(f'request error: {error}')
+        raise ConnectionError(f'request error: {error}')
 
     if response.status_code != 200:
         logging.error(f'Failed get answer from API. Status code = '
                       f'{response.status_code}')
-        raise ConnectionError('Failed get answer from API.')
-    try:
-        if type(response.json()) == dict:
-            logging.debug('response type dict')
-            return response.json()
-    except Exception as error:
-        logging.error(f'Type of homework_statuses not dict {error}')
-        raise KeyError('Type of homework_statuses not dict')
+        raise exceptions.APIResponseCodeError('Failed get answer from API.')
+
+    if isinstance(response.json(), dict):
+        logging.debug('response type dict')
+        return response.json()
+    else:
+        logging.error('Type of homework_statuses not dict')
+        raise TypeError('Type of homework_statuses not dict')
 
 
 def check_response(response):
     """Return endpoint."""
-    if type(response) != dict:
+    if not isinstance(response, dict):
         logging.error(f'response not dict, {type(response)}')
         raise TypeError(f'response not dict, {type(response)}')
     try:
@@ -98,18 +82,17 @@ def check_response(response):
         logging.error(f'Dict dont have a key "homeworks" {error}')
         raise KeyError(f'Dict dont have a key "homeworks" {error}')
 
-    if type(response['homeworks']) != list:
+    if not isinstance(response['homeworks'], list):
         logging.error(f'homeworks not list, {type(response["homeworks"])}')
         raise TypeError(f'homeworks not list, {type(response["homeworks"])}')
-    else:
-        logging.debug('type of "homeworks" is list')
-        return response['homeworks']
+
+    return response['homeworks']
 
 
-def parse_status(homeworks):
-    """Проверка статуса работы."""
+def parse_status(homework):
+    """Проверка, что данные пришли ввиде словаря и на наличие ключей."""
     try:
-        status = homeworks.get('status')
+        status = homework['status']
         verdict = HOMEWORK_VERDICTS[status]
         logging.debug(f'Response status is correct {status}')
     except KeyError as error:
@@ -117,13 +100,13 @@ def parse_status(homeworks):
         raise f'The data "status" is not correct, {error}'
 
     try:
-        homework_name = homeworks.get('homework_name')
+        homework_name = homework['homework_name']
         logging.debug(f'Name homework {homework_name}')
     except Exception as error:
         logging.error(f'lesson_name is incorrect, {error}')
         raise f'The data "lesson_name" is not correct, {error}'
 
-    if homeworks.get('homework_name') is None:
+    if homework.get('homework_name') is None:
         logging.error('Key "homework_name" not exists')
         raise KeyError('Key "homework_name" not exists')
 
@@ -141,6 +124,7 @@ def parse_status(homeworks):
 def main():
     """Основная логика работы бота."""
     if not check_tokens():
+        logging.critical('One or more Token not found')
         sys.exit()
 
     bot = telegram.Bot(token=TELEGRAM_TOKEN)
@@ -158,6 +142,7 @@ def main():
                 anti_spam_check = sending_message
             else:
                 logging.debug('No changes')
+            timestamp = response.get('current_date', timestamp)
         except Exception as error:
             message = f'Сбой в работе программы: {error}'
             logging.error(message)
@@ -169,4 +154,13 @@ def main():
 
 
 if __name__ == '__main__':
+    logging.basicConfig(
+        level=logging.DEBUG,
+        handlers=[
+            logging.FileHandler(filename='main.log', mode='w',
+                                encoding='utf-8'),
+            logging.StreamHandler(stream=sys.stdout)
+        ],
+        format='%(asctime)s, %(levelname)s, %(message)s, %(name)s'
+    )
     main()
