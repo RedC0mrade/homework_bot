@@ -154,7 +154,7 @@ def main():
             message = f'Сбой в работе программы: {error}'
             logging.error(message)
             if message != anti_spam_check:
-                if bot.send_message(TELEGRAM_CHAT_ID, message):
+                if send_message(bot, message):
                     anti_spam_check = message
         finally:
             time.sleep(RETRY_PERIOD)
