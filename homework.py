@@ -45,6 +45,7 @@ def send_message(bot, message):
         return True
     except telegram.error.TelegramError as error:
         logging.error(f'Sending message failed error: {error}')
+        return False
 
 
 def get_api_answer(timestamp):
