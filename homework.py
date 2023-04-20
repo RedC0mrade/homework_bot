@@ -41,7 +41,8 @@ def send_message(bot, message):
     """Send message."""
     try:
         bot.send_message(TELEGRAM_CHAT_ID, message)
-        logging.debug('send message')
+        logging.debug(f'send message {message}')
+        return True
     except telegram.error.TelegramError as error:
         logging.error(f'Sending message failed error: {error}')
 
@@ -141,9 +142,8 @@ def main():
             sending_message = parse_status(homeworks[LAST_PROJECT])
             if sending_message != anti_spam_check:
                 logging.debug(f'New status аvailable {sending_message}')
-                send_message(bot, sending_message)
-                if bot.send_message(TELEGRAM_CHAT_ID,
-                                    sending_message)['message_id']:
+
+                if send_message(bot, sending_message):
                     logging.debug(f'message send {sending_message}')
                     anti_spam_check = sending_message
             else:
