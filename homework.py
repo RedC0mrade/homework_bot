@@ -141,7 +141,10 @@ def main():
             sending_message = parse_status(homeworks[LAST_PROJECT])
             if sending_message != anti_spam_check:
                 logging.debug(f'New status аvailable {sending_message}')
-                if bot.send_message(TELEGRAM_CHAT_ID, sending_message):
+                send_message(bot, sending_message)
+                if bot.send_message(TELEGRAM_CHAT_ID,
+                                    sending_message)['message_id']:
+                    logging.debug(f'message send {sending_message}')
                     anti_spam_check = sending_message
             else:
                 logging.debug('No changes')
