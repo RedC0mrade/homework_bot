@@ -72,6 +72,9 @@ def get_api_answer(timestamp):
 
 def check_response(response):
     """Return endpoint."""
+    if not response:
+        raise IndexError('Никаких обновлений в статусе нет')
+
     if not isinstance(response, dict):
         logging.error(f'response not dict, {type(response)}')
         raise TypeError(f'response not dict, {type(response)}')
@@ -138,8 +141,8 @@ def main():
             sending_message = parse_status(homeworks[LAST_PROJECT])
             if sending_message != anti_spam_check:
                 logging.debug(f'New status аvailable {sending_message}')
-                send_message(bot, sending_message)
-                anti_spam_check = sending_message
+                if bot.send_message(TELEGRAM_CHAT_ID, sending_message):
+                    anti_spam_check = sending_message
             else:
                 logging.debug('No changes')
             timestamp = response.get('current_date', timestamp)
@@ -147,8 +150,8 @@ def main():
             message = f'Сбой в работе программы: {error}'
             logging.error(message)
             if message != anti_spam_check:
-                send_message(bot, message)
-                anti_spam_check = message
+                if bot.send_message(TELEGRAM_CHAT_ID, message):
+                    anti_spam_check = message
         finally:
             time.sleep(RETRY_PERIOD)
 
