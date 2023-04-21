@@ -7,7 +7,7 @@ import requests
 import telegram
 from dotenv import load_dotenv
 
-import exceptions
+from exceptions import APIResponseCodeError
 
 
 load_dotenv()
@@ -35,6 +35,8 @@ def check_tokens():
     if PRACTICUM_TOKEN and TELEGRAM_TOKEN and TELEGRAM_CHAT_ID:
         logging.debug('all token in place')
         return True
+    else:
+        return False
 
 
 def send_message(bot, message):
@@ -56,39 +58,28 @@ def get_api_answer(timestamp):
                                 params={'from_date': timestamp})
         logging.debug(f'status {response}. Ok')
     except requests.RequestException as error:
-        logging.error(f'request error: {error}')
         raise ConnectionError(f'request error: {error}')
 
     if response.status_code != 200:
-        logging.error(f'Failed get answer from API. Status code = '
-                      f'{response.status_code}')
-        raise exceptions.APIResponseCodeError('Failed get answer from API.')
+        raise APIResponseCodeError('Failed get answer from API.')
 
-    if isinstance(response.json(), dict):
-        logging.debug('response type dict')
-        return response.json()
-    else:
-        logging.error('Type of homework_statuses not dict')
-        raise TypeError('Type of homework_statuses not dict')
+    return response.json()
 
 
 def check_response(response):
     """Return endpoint."""
     if not response:
-        raise IndexError('Никаких обновлений в статусе нет')
+        raise APIResponseCodeError('Никаких обновлений в статусе нет')
 
     if not isinstance(response, dict):
-        logging.error(f'response not dict, {type(response)}')
         raise TypeError(f'response not dict, {type(response)}')
     try:
         response['homeworks']
         logging.debug('key homework excess')
     except Exception as error:
-        logging.error(f'Dict dont have a key "homeworks" {error}')
         raise KeyError(f'Dict dont have a key "homeworks" {error}')
 
     if not isinstance(response['homeworks'], list):
-        logging.error(f'homeworks not list, {type(response["homeworks"])}')
         raise TypeError(f'homeworks not list, {type(response["homeworks"])}')
 
     return response['homeworks']
@@ -97,6 +88,12 @@ def check_response(response):
 def parse_status(homework):
     """Проверка, что данные пришли ввиде словаря и на наличие ключей."""
     try:
+        if not homework['status']:
+            raise KeyError('Missing key status')
+
+        if homework['status'] not in HOMEWORK_VERDICTS:
+            raise KeyError('Missing key in HOMEWORK_VERDICTS')
+
         status = homework['status']
         verdict = HOMEWORK_VERDICTS[status]
         logging.debug(f'Response status is correct {status}')
@@ -116,11 +113,10 @@ def parse_status(homework):
         raise KeyError('Key "homework_name" not exists')
 
     try:
-        message = f'Изменился статус проверки работы "{homework_name}". ' \
-                  f'{verdict}'
-        if type(message) == str:
-            logging.debug(type(message))
-            return message
+        message = (f'Изменился статус проверки работы "{homework_name}". '
+                   f'{verdict}')
+        logging.debug(type(message))
+        return message
     except Exception as error:
         logging.error(f'return not string {error}, {type(message)}')
         raise f'return not string {error}, {status}, {type(message)}'
@@ -147,9 +143,10 @@ def main():
                 if send_message(bot, sending_message):
                     logging.debug(f'message send {sending_message}')
                     anti_spam_check = sending_message
+                    timestamp = response.get('current_date', timestamp)
             else:
                 logging.debug('No changes')
-            timestamp = response.get('current_date', timestamp)
+
         except Exception as error:
             message = f'Сбой в работе программы: {error}'
             logging.error(message)
