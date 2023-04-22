@@ -35,8 +35,6 @@ def check_tokens():
     if PRACTICUM_TOKEN and TELEGRAM_TOKEN and TELEGRAM_CHAT_ID:
         logging.debug('all token in place')
         return True
-    else:
-        return False
 
 
 def send_message(bot, message):
@@ -87,19 +85,15 @@ def check_response(response):
 
 def parse_status(homework):
     """Проверка, что данные пришли ввиде словаря и на наличие ключей."""
-    try:
-        if not homework['status']:
-            raise KeyError('Missing key status')
+    if not homework['status']:
+        raise KeyError('Missing key status')
 
-        if homework['status'] not in HOMEWORK_VERDICTS:
-            raise KeyError('Missing key in HOMEWORK_VERDICTS')
+    if homework['status'] not in HOMEWORK_VERDICTS:
+        raise KeyError('Missing key in HOMEWORK_VERDICTS')
 
-        status = homework['status']
-        verdict = HOMEWORK_VERDICTS[status]
-        logging.debug(f'Response status is correct {status}')
-    except KeyError as error:
-        logging.error(f'status of homeworks is incorrect, {error}')
-        raise f'The data "status" is not correct, {error}'
+    status = homework['status']
+    verdict = HOMEWORK_VERDICTS[status]
+    logging.debug(f'Response status is correct {status}')
 
     try:
         homework_name = homework['homework_name']
