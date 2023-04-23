@@ -35,6 +35,7 @@ def check_tokens():
     if PRACTICUM_TOKEN and TELEGRAM_TOKEN and TELEGRAM_CHAT_ID:
         logging.debug('all token in place')
         return True
+    return False
 
 
 def send_message(bot, message):
